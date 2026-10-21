@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 const string url = "https://vca.eveselibaspunkts.lv/lv/Booking/AvailableTimeSlots?EmbeddedCode=010064120&InstitutionCode=2&SpecialistCode=11097910418&SpecialityCode=P13&ServiceCode";
 const string doctor = "Pasters Vitālijs";
-const string fullText = "xxx";
+const string fullText = "visi atvērtie pieraksta laiki ir aizpildīti";
 const string stateFile = "state.txt";
 
 var token = Environment.GetEnvironmentVariable("TG_TOKEN")
