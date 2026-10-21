@@ -20,22 +20,43 @@ var context = await browser.NewContextAsync(new()
 });
 var page = await context.NewPageAsync();
 
-await page.GotoAsync(url);
+// до 3 попыток открыть страницу и дождаться имени врача
+const int attempts = 3;
+for (int attempt = 1; attempt <= attempts; attempt++)
+{
+    try
+    {
+        await page.GotoAsync(url, new()
+        {
+            WaitUntil = WaitUntilState.DOMContentLoaded,
+            Timeout = 60000
+        });
 
-// ждём, пока имя врача появится в видимом тексте страницы
-try
-{
-    await page.WaitForFunctionAsync(
-        "name => document.body.innerText.toLowerCase().includes(name.toLowerCase())",
-        doctor,
-        new() { Timeout = 45000 });
-}
-catch (TimeoutException)
-{
-    var dump = await page.InnerTextAsync("body");
-    Console.WriteLine("Врача на странице не нашли. Текст страницы:");
-    Console.WriteLine(dump.Length > 1500 ? dump[..1500] : dump);
-    throw;
+        await page.WaitForFunctionAsync(
+            "name => document.body.innerText.toLowerCase().includes(name.toLowerCase())",
+            doctor,
+            new() { Timeout = 45000 });
+
+        break; // всё получилось
+    }
+    catch (TimeoutException)
+    {
+        Console.WriteLine($"Попытка {attempt} из {attempts} не удалась");
+
+        if (attempt == attempts)
+        {
+            try
+            {
+                var dump = await page.InnerTextAsync("body");
+                Console.WriteLine("Текст страницы:");
+                Console.WriteLine(dump.Length > 1500 ? dump[..1500] : dump);
+            }
+            catch (Exception) { }
+            throw;
+        }
+
+        await Task.Delay(5000);
+    }
 }
 
 // закрываем окно cookies, если оно есть (не страшно, если его нет)
