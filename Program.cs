@@ -13,24 +13,46 @@ var chatId = Environment.GetEnvironmentVariable("TG_CHAT_ID")
 
 using var pw = await Playwright.CreateAsync();
 await using var browser = await pw.Chromium.LaunchAsync();
-var page = await browser.NewPageAsync();
+var context = await browser.NewContextAsync(new()
+{
+    ViewportSize = new() { Width = 1366, Height = 900 },
+    Locale = "lv-LV"
+});
+var page = await context.NewPageAsync();
 
 await page.GotoAsync(url);
 
-// ждём, пока на странице появится имя врача (значит, всё загрузилось)
-await page.GetByText(doctor).First.WaitForAsync(new() { Timeout = 30000 });
+// ждём, пока имя врача появится в видимом тексте страницы
+try
+{
+    await page.WaitForFunctionAsync(
+        "name => document.body.innerText.toLowerCase().includes(name.toLowerCase())",
+        doctor,
+        new() { Timeout = 45000 });
+}
+catch (TimeoutException)
+{
+    var dump = await page.InnerTextAsync("body");
+    Console.WriteLine("Врача на странице не нашли. Текст страницы:");
+    Console.WriteLine(dump.Length > 1500 ? dump[..1500] : dump);
+    throw;
+}
 
-// закрываем окно cookies, если оно есть
-var cookie = page.GetByText("Atsakos");
-if (await cookie.CountAsync() > 0)
-    await cookie.First.ClickAsync();
+// закрываем окно cookies, если оно есть (не страшно, если его нет)
+try
+{
+    await page.GetByText("Atsakos").First.ClickAsync(new() { Timeout = 3000 });
+}
+catch (Exception) { }
 
 await Task.Delay(2000); // даём слотам подгрузиться
 
 var body = await page.InnerTextAsync("body");
 var i = body.IndexOf(doctor, StringComparison.OrdinalIgnoreCase);
+if (i < 0) throw new Exception("Имя врача пропало со страницы");
+
 var block = body.Substring(i, Math.Min(600, body.Length - i));
-block = Regex.Replace(block, @"\s+", " "); // убираем переносы и неразрывные пробелы
+block = Regex.Replace(block, @"\s+", " ");
 
 bool isFull = block.Contains(fullText, StringComparison.OrdinalIgnoreCase);
 var prev = File.Exists(stateFile) ? File.ReadAllText(stateFile).Trim() : "full";
